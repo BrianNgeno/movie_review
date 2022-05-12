@@ -1,13 +1,45 @@
 from . import db
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
+from . import login_manager
 
-
-class User(db.Model):
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id)) 
+class User(UserMixin,db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer,primary_key = True)
-    username = db.Column(db.String(255))
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(300))
+    email = db.Column(db.String(300),unique=True, index= True)
+    role_id = db.Column(db.Integer,db.ForeignKey('roles.id'))
+    bio = db.Column(db.String(400))
+    profile_pic = db.Column(db.String())
+    pass_s = db.Column(db.String(300))
 
     def __repr__(self):
         return f'User {self.username}'
+
+    @property
+    def password(self):
+        raise AttributeError('this is restriced')
+
+    @password.setter
+    def password(self,password):
+        self.pass_s = generate_password_hash(password)
+
+    def verify_hash(self,password):
+        return check_password_hash(self.pass_s,password)
+
+    
+
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(300))
+    user = db.relationship('User',backref='role', lazy="dynamic")
+
+    def __repr__(self):
+        return f'Role {self.title}'
 class Movie:
     '''
     Movie class to define Movie Objects

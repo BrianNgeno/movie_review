@@ -1,9 +1,11 @@
-from flask import render_template,request,redirect,url_for
-from . import main
-from ..requests import get_movies,get_movie,search_movie
-from .forms import ReviewForm
-from ..models import Review
+from flask import redirect, render_template, request, url_for, abort
+from flask_login import login_required
 
+from ..models import Review, User
+from ..requests import get_movie, get_movies, search_movie
+from . import main
+from .forms import ReviewForm, ProfileForm
+from .. import db,photos
 
 # Views
 @main.route('/')
@@ -28,6 +30,7 @@ def index():
 
 
 @main.route('/movie/review/new/<int:id>', methods = ['GET','POST'])
+@login_required
 def new_review(id):
     form = ReviewForm()
     movie = get_movie(id)
@@ -64,3 +67,36 @@ def search(movie_name):
     searched_movies = search_movie(movie_name_format)
     title = f'search results for {movie_name}'
     return render_template('search.html',movies = searched_movies)
+
+@main.route('/profile/<user_name>')
+def profile(user_name):
+    user = User.query.filter_by(username=user_name).first()
+
+    if user is None:
+        abort(404)
+
+    return render_template("profile/profile.html", user=user)
+
+@main.route('/profile/<user_name>/update', methods=["GET","POST"])
+def update_profile(user_name):
+    user= User.query.filter_by(username=user_name).first()
+    if user is None:
+        abort(404)
+    profile_form = ProfileForm()
+    if profile_form.validate_on_submit():
+        user.bio = profile_form.bio.data
+        db.session.add(user)
+        db.session.commit()
+
+        return redirect(url_for('.profile', user_name=user.username))
+    return render_template('profile/update.html', profile_form=profile_form)
+
+@main.route('/profile/<user_name>/update/pic', methods=["POST"])
+def profile_pic(user_name):
+    user= User.query.filter_by(username=user_name).first()
+    if 'photo' in request.files:
+        filename = photos.save(request.files['photo'])
+        path = f'photos/{filename}'
+        user.profile_pic = path
+        db.session.commit()
+    return redirect(url_for('main.profile', user_name=user_name))
